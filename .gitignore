@@ -1,0 +1,10 @@
+node_modules
+dist
+.webpack
+.serverless
+coverage
+
+.idea
+/.nyc_output
+
+.history
