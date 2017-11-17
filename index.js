@@ -107,11 +107,6 @@ function resolveDecorators(fileNames, options) {
 
 const ROOT_PATH = path.join(__dirname, '..', '..', 'src')
 
-const HANDLERS = [
-  'cqrsHandler',
-  'handler'
-]
-
 class ServerlessAnnotations {
   constructor(serverless, options) {
     this.serverless = serverless;
@@ -136,9 +131,12 @@ class ServerlessAnnotations {
 
   collectLambda() {
     return new Promise((resolve, reject) => {
-      let config = _.merge({}, {
+      let config = _.assign({}, {
         pattern: '**/*.ts',
-        ignore: ['src/shared']
+        ignore: ['src/shared'],
+        handlers: {
+          handler: {}
+        }
       }, this.serverless.service.custom.annotations);
 
       const files = glob.sync(config.pattern, {
@@ -146,21 +144,39 @@ class ServerlessAnnotations {
         // root: ROOT_PATH
       })
       let decorators = resolveDecorators(files, {
-          target: ts.ScriptTarget.ES5,
-          module: ts.ModuleKind.CommonJS
-        })
-        .filter(d => HANDLERS.indexOf(d.name) >= 0)
+        target: ts.ScriptTarget.ES5,
+        module: ts.ModuleKind.CommonJS
+      });
+
+      let handlers = decorators
+        .filter(d => Object.keys(config.handlers).indexOf(d.name) >= 0)
         .map(d => ({
           name: d.name,
           options: _.mapValues(_.keyBy(d.parameters, 'name'), 'value'),
           fileName: d.fileName.replace(ROOT_PATH + '/', ''),
-          handlers: d.childDecorators.map(c => ({
+          handlers: d.childDecorators ? d.childDecorators.map(c => ({
             name: c.name,
             options: _.mapValues(_.keyBy(c.parameters, 'name'), 'value')
-          }))
+          })) : undefined
         }));
 
-      console.log(JSON.stringify(decorators))
+      console.log(JSON.stringify(handlers))
+      this.serverless.service.functions = this.serverless.service.functions || {}
+      for (let handler of handlers) {
+        if (!handler.options) {
+          throw new Error('Could not get handler options')
+        }
+        if (!handler.options.name) {
+          throw new Error('Hanlder name has to be provided')
+        }
+        if (this.serverless.service.functions[handler.options.name]) {
+          throw new Error(`Handler with name ${handler.options.name} already exists`)
+        }
+        this.serverless.service.functions[handler.options.name] = Object.assign({}, {
+          handler: handler.fileName.replace(/.ts$/, '.default')
+        }, config.handlers[handler.name], _.omit(handler.options, 'name'))
+      }
+      console.log(JSON.stringify(this.serverless.service.functions))
       resolve()
 
       // reject()
@@ -172,4 +188,4 @@ class ServerlessAnnotations {
 
 }
 
-module.exports = LambdaCollector;
+module.exports = ServerlessAnnotations;
