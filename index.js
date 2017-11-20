@@ -123,7 +123,8 @@ class ServerlessAnnotations {
     };
 
     this.hooks = {
-      'before:package:createDeploymentArtifacts': () => this.collectLambda(),
+      'before:package:initialize': () => this.collectLambda(),
+      'before:invoke:invoke': () => this.collectLambda(),
       'collect:init': () => this.collectLambda(),
     };
 
@@ -160,8 +161,11 @@ class ServerlessAnnotations {
           })) : undefined
         }));
 
-      console.log(JSON.stringify(handlers))
       this.serverless.service.functions = this.serverless.service.functions || {}
+      let stage = this.serverless.service.provider.stage;
+      if (this.serverless.variables.options.stage) {
+        stage = this.serverless.variables.options.stage;
+      }
       for (let handler of handlers) {
         if (!handler.options) {
           throw new Error('Could not get handler options')
@@ -173,7 +177,8 @@ class ServerlessAnnotations {
           throw new Error(`Handler with name ${handler.options.name} already exists`)
         }
         this.serverless.service.functions[handler.options.name] = Object.assign({}, {
-          handler: handler.fileName.replace(/.ts$/, '.default')
+          handler: handler.fileName.replace(/.ts$/, '.default'),
+          name: `${this.serverless.service.service}-${stage}-${handler.options.name}`
         }, config.handlers[handler.name], _.omit(handler.options, 'name'))
       }
       console.log(JSON.stringify(this.serverless.service.functions))
