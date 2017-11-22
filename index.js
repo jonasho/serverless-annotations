@@ -125,6 +125,7 @@ class ServerlessAnnotations {
     this.hooks = {
       'before:package:initialize': () => this.collectLambda(),
       'before:invoke:invoke': () => this.collectLambda(),
+      'before:deploy:function:initialize' : () => this.collectLambda(),
       'collect:init': () => this.collectLambda(),
     };
 
